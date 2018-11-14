@@ -1,0 +1,39 @@
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning(suppress:4996)
+
+#include <stdio.h> 
+#include <string.h> 
+#include <windows.h> 
+#include <io.h>// 파일찾기 
+#define PATH_SIZE 1000 
+
+
+int main(int argc, char** argv) {
+
+
+	// 현재 프로그램 주소로 시작 프로그램 등록 
+	//SetStartProgram(argv[0]); 
+
+	//////여기부터
+	//콘솔창 안보이게 
+	HWND hWndConsole = GetConsoleWindow(); //윈도우 핸들 콘솔창 호출 https://docs.microsoft.com/ko-kr/windows/console/getconsolewindow
+	ShowWindow(hWndConsole, SW_HIDE); //선택한 윈도우 창을 숨긴다 https://m.blog.naver.com/PostView.nhn?blogId=hol_ding&logNo=60197712451&proxyReferer=https%3A%2F%2Fwww.google.co.kr%2F
+	
+	printf("hello world\n");
+
+	//창이 안보이게 파일을 열음 
+	ShellExecute(NULL, "open", argv[0], NULL, NULL, SW_HIDE);  //지정된 파일에 대한 분석 수행        https://docs.microsoft.com/en-us/windows/desktop/api/shellapi/nf-shellapi-shellexecutea 
+			//창핸들 선택//편집//파일탐험//발견//열기
+	/////여기까지 함수 분석해서 
+}
+/*
+shellExecute에 사용되는 객체들의 뜻
+HINSTANCE ShellExecuteA(
+	HWND   hwnd,부모 창의 핸들
+	LPCSTR lpOperation, 지정된 파일을 엽ㄴ다
+	LPCSTR lpFile, 개체의 구문분석 이름을 전달
+	LPCSTR lpParameters, 프로그램에 전달되는 매개 변수를 지정로 끝나는 문자열
+	LPCSTR lpDirectory,값이 NULL 이면 현재 작업 디렉토리가 사용
+	INT    nShowCmd, 창을 숨기고 다른 창을 활성화합니다
+);
+*/
