@@ -1,0 +1,73 @@
+#include <stdio.h>
+#include<stdlib.h>
+#include<string.h>
+
+#include<openssl/rand.h>
+#include<openssl/evp.h>
+
+//읽어 들이는 바이트 수
+#define NUM_BYTES_READ 32
+
+int do_crypt(const unsigned char *key, const unsigned char *iv, FILE *ifp, FILE *ofp, int isEncrypt){
+    
+    EVP_CIPHER_CTX *ctx=EVP_CIPHER_CTX_new();
+    
+    if(ctx == NULL){
+        printf("EVP_CIPHER_CTX_new is NULL error!!\n");
+        return -1;
+    }
+    
+    if(!(EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv, isEncrypt))){
+        printf("EVP_CipherInit_ex error!!\n");
+        return -1;
+    }
+    
+    unsigned char *input_buf= (unsigned char*)malloc(NUM_BYTES_READ);
+    unsigned char *output_buf= (unsigned char*)malloc(NUM_BYTES_READ+ EVP_CIPHER_CTX_block_size(ctx));
+    if(input_buf ==NULL){
+        printf("cipher_buf_dec allocaion error!! \n");
+        return -1;
+    }
+    if(output_buf ==NULL){
+        printf("plain_buf_dec allocaion error!! \n");
+        return -1;
+    }
+    
+    int inlen =0 ,outtxtlen =0;
+    
+    while(1){
+        
+        //1바이트씩 읽어 들여와 총 32바이트를  plain_buf에 저장하는 역할을 한다.
+        inlen= (int)fread(input_buf, 1, NUM_BYTES_READ, ifp);
+        
+        //정해진 바이트 수에 충족하지 못하면 Final함수를 호출하기위해 반복문을 빠져나간다. 여기선 NUM_BYTES_READ
+        if(inlen<=0)
+            break;
+        
+        //ctx_enc를 참조해서 plain_buf에서 inlength만큼 cipher_buf에 암호문을 쓴다 그리고 암호화된 바이트 수만큼 ci_txtlength로 반환된다.
+        if( 1 != EVP_CipherUpdate(ctx, output_buf, &outtxtlen, input_buf, inlen)){
+            printf("EVP_CipherUpdate error!!! \n");
+            return -1;
+        }
+        
+        printf("\n inlen = %d , ctxlen = %d", inlen, outtxtlen);
+        printf("\n\n");
+        
+        //암호문 출력
+        fwrite(output_buf, 1, outtxtlen, ofp);
+    }
+    
+    
+    //ctx_enc는 cipher_buf가 무슨파일이 어디까지 암호화 되있는지 알고있다 따라서 cipher_buf에 ci_txtlength만 인자로 넘겨주면 된다.
+    //EVP_CipherFinal(<#EVP_CIPHER_CTX *ctx#>, <#unsigned char *outm#>, <#int *outl#>)
+    EVP_CipherFinal(ctx, output_buf, &outtxtlen);
+    fwrite(output_buf, 1, outtxtlen, ofp);
+    printf("\n ctxlen = %d \n\n" , outtxtlen);
+    
+    
+    EVP_CIPHER_CTX_free(ctx);
+    free(input_buf);
+    free(output_buf);
+    
+    return 0;
+}
